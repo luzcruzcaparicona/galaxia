@@ -1,0 +1,761 @@
+<title>Galaxia para Joel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500&family=Dancing+Script:wght@500;600&family=Great+Vibes&display=swap" rel="stylesheet">
+<style>
+/* Layout: foto real del espacio de fondo, escena WebGL encima; HUD tipo cabina en las esquinas */
+:root{
+  --void:#03040c;
+  --ink:#ece8ff;
+  --dim:#9a9fcc;
+  --nova:#ffd2a1;
+  --nebula:#9b7bff;
+  --ion:#66e3ff;
+  --serif:'Cormorant Garamond','Iowan Old Style',Georgia,serif;
+  --mono:'JetBrains Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+  --star:polygon(50% 0%,66.46% 27.35%,97.55% 34.55%,76.63% 58.65%,79.39% 90.45%,50% 78%,20.61% 90.45%,23.37% 58.65%,2.45% 34.55%,33.54% 27.35%);
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#sky{position:fixed;inset:-6%;background:var(--void) url("fotos/fondo.jpg") center/cover no-repeat;z-index:0;will-change:transform}
+#sky::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(3,4,12,.15) 0%,rgba(3,4,12,.55) 75%,rgba(3,4,12,.8) 100%)}
+#scene,#fx{position:fixed;inset:0;width:100%;height:100%;display:block}
+#scene{z-index:1;touch-action:none;cursor:grab}
+#scene:active{cursor:grabbing}
+#fx{pointer-events:none;z-index:2}
+
+.hud{position:fixed;left:0;right:0;padding-inline:20px;z-index:5;pointer-events:none}
+#top{top:calc(env(safe-area-inset-top,0px) + 30px);text-align:center}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--ion);opacity:.9}
+h1{font:italic 500 clamp(2.3rem,6.6vw,4.6rem)/1 var(--serif);margin:.32em 0 .14em;text-wrap:balance;text-shadow:0 0 28px rgba(155,123,255,.7),0 2px 10px rgba(0,0,0,.6)}
+.name{font:500 clamp(1rem,2.4vw,1.35rem)/1.25 var(--serif);color:var(--nova);letter-spacing:.06em;text-shadow:0 2px 10px rgba(0,0,0,.7)}
+
+#bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 20px);display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.readout{font:400 12px/1.8 var(--mono);color:#c4c8ee;letter-spacing:.05em;font-variant-numeric:tabular-nums;min-width:0;text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.readout b{color:var(--ink);font-weight:500}
+.controls{display:flex;gap:10px;pointer-events:auto;flex-shrink:0}
+.btn{width:50px;height:50px;border-radius:50%;border:1px solid rgba(102,227,255,.35);background:rgba(10,14,40,.6);color:var(--ink);display:grid;place-items:center;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:border-color .2s,transform .2s}
+.btn:hover{border-color:var(--ion);transform:translateY(-1px)}
+.btn:focus-visible{outline:2px solid var(--ion);outline-offset:3px}
+.btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#msgBtn{border-color:rgba(255,210,161,.5);box-shadow:0 0 22px rgba(155,123,255,.45)}
+
+/* Botón grande de la carta, centrado sobre el pie */
+#letterBtn{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);transform:translateX(-50%);z-index:6;border:0;background:none;padding:6px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--ink);opacity:0;pointer-events:none;transition:opacity 1.2s ease}
+#letterBtn.show{opacity:1;pointer-events:auto}
+#letterBtn:focus-visible{outline:2px solid var(--ion);outline-offset:4px;border-radius:12px}
+.env{position:relative;width:74px;height:50px;border-radius:5px;background:linear-gradient(160deg,#fff4e2,#f3d9b5);box-shadow:0 0 28px rgba(255,170,200,.7),0 6px 16px rgba(0,0,0,.45);animation:pulse 2.2s ease-in-out infinite}
+.env::before{content:"";position:absolute;inset:0;border-radius:5px;background:linear-gradient(to top right,transparent 49%,rgba(190,140,110,.45) 50%,transparent 52%),linear-gradient(to top left,transparent 49%,rgba(190,140,110,.45) 50%,transparent 52%)}
+.env::after{content:"";position:absolute;left:0;right:0;top:0;height:30px;background:linear-gradient(170deg,#ffe9cc,#ecc79c);clip-path:polygon(0 0,100% 0,50% 100%)}
+.env .seal{position:absolute;left:50%;top:20px;width:22px;height:22px;margin-left:-11px;z-index:1;color:#d23b5e;font-size:22px;line-height:22px;text-align:center;filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+.env-label{font:600 1.35rem/1 'Dancing Script',cursive;color:#ffe3ef;text-shadow:0 0 12px rgba(255,120,180,.9),0 2px 6px rgba(0,0,0,.8)}
+@keyframes pulse{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.06)}}
+
+#hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 190px);text-align:center;font:400 11px/1.5 var(--mono);letter-spacing:.12em;color:var(--ink);z-index:5;pointer-events:none;opacity:0;transition:opacity 1s ease;padding-inline:20px;text-shadow:0 1px 6px rgba(0,0,0,.9)}
+#hint.show{opacity:.9}
+
+#launch{position:fixed;inset:0;z-index:20;width:100%;border:0;margin:0;padding:24px;cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;background:radial-gradient(ellipse at center,rgba(3,4,12,.3) 0%,rgba(3,4,12,.88) 70%);transition:opacity .9s ease}
+#launch.gone{opacity:0;pointer-events:none}
+#launch:focus-visible{outline:none}
+#launch:focus-visible .launch-label{text-decoration:underline;text-underline-offset:6px}
+.orb{position:relative;width:150px;height:110px;animation:bob 4s ease-in-out infinite}
+.orb::before{content:"";position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px 0 0 -31px;border-radius:50%;background:radial-gradient(circle at 34% 30%,#e3d8ff 0%,#8e7bff 38%,#2c237a 78%,#120f33 100%);box-shadow:0 0 40px rgba(155,123,255,.55)}
+.orb::after{content:"";position:absolute;left:50%;top:50%;width:140px;height:34px;margin:-17px 0 0 -70px;border-radius:50%;border:2px solid rgba(102,227,255,.75);border-top-color:transparent;transform:rotate(-16deg)}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.launch-label{font:italic 500 clamp(1.8rem,5.4vw,2.6rem)/1 var(--serif)}
+.launch-sub{font:400 11px/1 var(--mono);letter-spacing:.3em;text-transform:uppercase;color:var(--ion);animation:blink 2.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.45}50%{opacity:1}}
+#count{font:500 clamp(4.5rem,20vw,9rem)/1 var(--mono);color:var(--nova);text-shadow:0 0 30px rgba(255,210,161,.6)}
+
+/* Capas emergentes: mensaje, galería y foto ampliada */
+.layer{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:24px 16px;background:rgba(3,4,12,.82);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:opacity .45s ease,visibility .45s}
+.layer.open{opacity:1;visibility:visible}
+.close{position:absolute;top:12px;right:12px;width:44px;height:44px;border:0;background:none;color:var(--dim);font:400 24px/1 var(--mono);cursor:pointer;border-radius:50%;z-index:2}
+.close:hover{color:var(--ink)}
+.close:focus-visible{outline:2px solid var(--ion)}
+
+.card{position:relative;width:100%;max-width:560px;max-height:82vh;overflow-y:auto;padding:44px 34px 34px;border-radius:6px;background:linear-gradient(170deg,rgba(24,20,64,.97),rgba(6,8,22,.98));border:1px solid rgba(155,123,255,.35);box-shadow:0 0 60px rgba(155,123,255,.25);transform:translateY(16px);transition:transform .45s ease}
+.layer.open .card{transform:none}
+.card .eyebrow{display:block;margin-bottom:14px}
+.card h2{font:italic 500 2.2rem/1.05 var(--serif);margin:0 0 22px;color:var(--nova);text-wrap:balance}
+.card p{font:400 1.22rem/1.65 var(--serif);margin:0 0 14px;color:var(--ink)}
+.card .sign{margin-top:22px;font:400 11px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+
+/* La carta: papel crema con renglones y letra cursiva */
+.card.letter{max-width:600px;padding:52px 40px 40px;border-radius:4px;border:0;color:#3b2547;
+  background:repeating-linear-gradient(to bottom,transparent 0 39px,rgba(120,140,200,.22) 39px 40px),radial-gradient(ellipse at 30% 20%,#fffaf0,#f6e8cf 80%,#ecd7b4);
+  box-shadow:0 0 70px rgba(255,170,200,.35),0 20px 50px rgba(0,0,0,.55)}
+.letter .close{color:#8a6a7a}.letter .close:hover{color:#3b2547}
+.letter h2{font:400 3rem/1 'Great Vibes',cursive;color:#a8244a;margin:0 0 20px}
+.letter p{font:500 1.5rem/40px 'Dancing Script',cursive;color:#3b2547;margin:0 0 14px;text-wrap:pretty}
+.letter blockquote{margin:6px 0 18px;padding:4px 0 4px 18px;border-left:2px solid rgba(168,36,74,.45)}
+.letter blockquote p{font-size:1.4rem;color:#6a2a48;margin:0}
+.letter blockquote cite{display:block;font:600 1.15rem/32px 'Dancing Script',cursive;color:#a8244a;font-style:normal}
+.letter .firma{margin-top:18px;text-align:right;font:400 2.8rem/1.1 'Great Vibes',cursive;color:#a8244a}
+
+#gallery{align-items:stretch}
+.gal-inner{width:100%;max-width:980px;overflow-y:auto;padding-block:36px 24px;display:flex;flex-direction:column;gap:24px}
+.gal-head{text-align:center}
+.gal-head h2{font:italic 500 clamp(2rem,5vw,2.8rem)/1 var(--serif);margin:.3em 0 0;color:var(--nova)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:22px 14px}
+.tile{border:0;padding:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--dim);font:400 10px/1 var(--mono);letter-spacing:.15em}
+.tile .glow{width:100%;max-width:170px;filter:drop-shadow(0 0 10px rgba(255,210,161,.45));transition:transform .25s ease,filter .25s ease}
+.tile:hover .glow,.tile:focus-visible .glow{transform:scale(1.06) rotate(-4deg);filter:drop-shadow(0 0 16px rgba(255,210,161,.8))}
+.tile:focus-visible{outline:none;color:var(--ion)}
+.tile .rim{display:block;aspect-ratio:1;clip-path:var(--star);background:linear-gradient(160deg,#fff1dc,#ffd2a1 40%,#b59bff);padding:6%}
+.tile img{display:block;width:100%;height:100%;object-fit:cover;clip-path:var(--star)}
+
+#viewer figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:100%}
+#viewer img{display:block;max-width:min(92vw,900px);max-height:74vh;border-radius:4px;border:1px solid rgba(255,210,161,.5);box-shadow:0 0 50px rgba(155,123,255,.4);transform:scale(.96);transition:transform .4s ease}
+#viewer.open img{transform:none}
+#viewer figcaption{font:400 11px/1 var(--mono);letter-spacing:.2em;color:var(--dim);font-variant-numeric:tabular-nums}
+.nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:1px solid rgba(102,227,255,.35);background:rgba(10,14,40,.7);color:var(--ink);cursor:pointer;display:grid;place-items:center;z-index:2}
+.nav:hover{border-color:var(--ion)}
+.nav:focus-visible{outline:2px solid var(--ion);outline-offset:3px}
+.nav svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#prev{left:12px}#next{right:12px}
+
+@media (max-width:560px){
+  #top{top:calc(env(safe-area-inset-top,0px) + 20px)}
+  .hide-sm{display:none}
+  .card{padding:40px 22px 26px}
+  .card p{font-size:1.1rem}
+  .letter p{font-size:1.3rem;line-height:36px}
+  .card.letter{padding:48px 22px 30px;background-image:repeating-linear-gradient(to bottom,transparent 0 35px,rgba(120,140,200,.22) 35px 36px),radial-gradient(ellipse at 30% 20%,#fffaf0,#f6e8cf 80%,#ecd7b4)}
+  .letter h2{font-size:2.6rem}
+  .grid{grid-template-columns:repeat(3,1fr);gap:16px 8px}
+  .nav{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:none}
+  #viewer img{max-height:66vh}
+}
+@media (prefers-reduced-motion:reduce){
+  .orb,.launch-sub,.env{animation:none}
+}
+</style>
+
+<div id="sky" aria-hidden="true"></div>
+<canvas id="scene" aria-label="Galaxia en 3D con fotos en marcos de estrella y frases que giran"></canvas>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<header class="hud" id="top">
+  <div class="eyebrow">Misión J · 02·2018 → ∞</div>
+  <h1 id="title">Feliz día, mi amor</h1>
+  <div class="name" id="name">Joel Marcos Acho Huanca</div>
+</header>
+
+<div id="hint">Arrastra para girar · toca una estrella para ver la foto</div>
+
+<footer class="hud" id="bottom">
+  <div class="readout">
+    <div>Distancia entre nosotros <b>0,00 años luz</b></div>
+    <div class="hide-sm">Despegue <b>02·2018</b> · Destino <b>siempre</b></div>
+    <div>Días de viaje <b id="days">—</b> · Recuerdos <b id="nPhotos">—</b></div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="soundBtn" type="button" aria-label="Silenciar música" aria-pressed="true">
+      <svg viewBox="0 0 24 24" id="soundIcon"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+    </button>
+    <button class="btn" id="galBtn" type="button" aria-label="Ver todas las fotos">
+      <svg viewBox="0 0 24 24"><path d="m12 3 2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6-4.5-4.1 6-.7z"/></svg>
+    </button>
+    <button class="btn" id="msgBtn" type="button" aria-label="Abrir mensaje">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+    </button>
+  </div>
+</footer>
+
+<button id="launch" type="button">
+  <span class="orb" aria-hidden="true"></span>
+  <span class="launch-label" id="launchLabel">Toca para despegar</span>
+  <span class="launch-sub" id="launchSub">Viaje con destino a ti</span>
+  <span id="count" hidden></span>
+</button>
+
+<button id="letterBtn" type="button" aria-label="Abrir la carta">
+  <span class="env" aria-hidden="true"><span class="seal">❤</span></span>
+  <span class="env-label">Aprieta aquí</span>
+</button>
+
+<div class="layer" id="msg" role="dialog" aria-modal="true" aria-labelledby="msgTitle">
+  <div class="card letter">
+    <button class="close" id="msgClose" type="button" aria-label="Cerrar carta">×</button>
+    <h2 id="msgTitle">Amor mío,</h2>
+    <div id="msgBody"></div>
+    <div class="firma" id="msgSign"></div>
+  </div>
+</div>
+
+<div class="layer" id="gallery" role="dialog" aria-modal="true" aria-labelledby="galTitle">
+  <button class="close" id="galClose" type="button" aria-label="Cerrar galería">×</button>
+  <div class="gal-inner">
+    <div class="gal-head">
+      <div class="eyebrow">Constelación de recuerdos</div>
+      <h2 id="galTitle">Nuestras estrellas</h2>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<div class="layer" id="viewer" role="dialog" aria-modal="true" aria-label="Foto ampliada">
+  <button class="close" id="viewClose" type="button" aria-label="Cerrar foto">×</button>
+  <button class="nav" id="prev" type="button" aria-label="Foto anterior"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
+  <figure>
+    <img id="viewImg" alt="">
+    <figcaption id="viewCap"></figcaption>
+  </figure>
+  <button class="nav" id="next" type="button" aria-label="Foto siguiente"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ======== Personaliza aquí ========
+const CONFIG={
+  titulo:"Feliz día, mi amor",
+  nombre:"Joel Marcos Acho Huanca",
+  inicio:"2018-02-01", // fecha en que empezó todo (AAAA-MM-DD)
+  // Canción propia: pon un .mp3 en la carpeta y escribe su nombre, p. ej. "musica.mp3".
+  // Si se deja vacío (o no se encuentra el archivo) suena la música ambiental generada.
+  musica:"fotos/emanorados.mp3",
+  // fx / fy: punto de la foto que queda al centro de la estrella (0 = izquierda/arriba, 1 = derecha/abajo)
+  fotos:[
+    {src:"fotos/foto01.jpg",fx:.5,fy:.22},{src:"fotos/foto02.jpg",fx:.5,fy:.5},{src:"fotos/foto03.jpg",fx:.42,fy:.45},
+    {src:"fotos/foto04.jpg",fx:.5,fy:.28},{src:"fotos/foto05.jpg",fx:.5,fy:.18},{src:"fotos/foto06.jpg",fx:.5,fy:.3},
+    {src:"fotos/foto07.jpg",fx:.3,fy:.45},{src:"fotos/foto08.jpg",fx:.5,fy:.3},{src:"fotos/foto09.jpg",fx:.5,fy:.45},
+    {src:"fotos/foto10.jpg",fx:.5,fy:.35},{src:"fotos/foto11.jpg",fx:.5,fy:.42},{src:"fotos/foto12.jpg",fx:.5,fy:.38},
+    {src:"fotos/foto13.jpg",fx:.5,fy:.5},{src:"fotos/foto14.jpg",fx:.5,fy:.5},{src:"fotos/foto15.jpg",fx:.5,fy:.4},
+    {src:"fotos/foto16.jpg",fx:.5,fy:.45},{src:"fotos/foto17.jpg",fx:.5,fy:.33},{src:"fotos/foto18.jpg",fx:.5,fy:.45}
+  ],
+  frases:[
+    "Dios, tú y yo","Todo comenzó aquella noche · 02-2018","Te amo","Eres mi estrella favorita",
+    "Contigo el universo se queda corto","Gracias por ser tú","Mi lugar favorito del universo eres tú",
+    "Que el Señor nos cuide en cada viaje","Tu risa ilumina mis días","Te quiero más que estrellas hay",
+    "Contigo siempre a mil por hora","Gracias por los abrazos que me das","Eres mi órbita",
+    "Aquí siempre tienes un lugar","Feliz día, pienso en ti","Contigo todo brilla"
+  ],
+  // La carta: los párrafos se separan con una línea en blanco (\n\n).
+  // Un párrafo que empieza con « se muestra como cita; lo que va después de " — " es la referencia.
+  mensaje:"Nos conocimos una noche en la que el Señor nos regaló la oportunidad de encontrarnos.\n\nHoy amanece un nuevo día, y no cualquiera: hoy es el Día del Hombre. Sé que tu carga es grande, pero también sé que tus fuerzas vienen del Señor, nuestro Padre Dios, quien creó a alguien tan increíble como tú.\n\nDe verdad, estoy muy agradecida por tu vida. Eres quien hace latir mi corazoncito y quien me hace sonrojar.\n\n«Cual manzano entre los árboles del bosque es mi amado entre los hombres. Me encanta sentarme a su sombra; dulce a mi paladar es su fruto.» — Cantares 2:3\n\nQuiero que siempre confiemos en el Señor.",
+  firma:"Te amo ♥"
+};
+// ==================================
+
+const FOTOS=CONFIG.fotos;
+document.getElementById('title').textContent=CONFIG.titulo;
+document.getElementById('name').textContent=CONFIG.nombre;
+document.getElementById('nPhotos').textContent=FOTOS.length;
+(function(){
+  const start=new Date(CONFIG.inicio+'T00:00:00');
+  const d=Math.floor((Date.now()-start.getTime())/86400000);
+  document.getElementById('days').textContent=isFinite(d)?d.toLocaleString('es'):'—';
+})();
+const msgBody=document.getElementById('msgBody');
+CONFIG.mensaje.split(/\n\s*\n/).forEach(t=>{
+  t=t.trim();const p=document.createElement('p');
+  if(t.startsWith('«')){
+    const [q,ref]=t.split(' — ');
+    const bq=document.createElement('blockquote');p.textContent=q;bq.appendChild(p);
+    if(ref){const c=document.createElement('cite');c.textContent=ref;bq.appendChild(c);}
+    msgBody.appendChild(bq);
+  }else{p.textContent=t;msgBody.appendChild(p);}
+});
+document.getElementById('msgSign').textContent=CONFIG.firma||'';
+
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const small=()=>innerWidth<640;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+// ---------- Escena (fondo transparente: se ve la foto del espacio detrás) ----------
+const canvas=document.getElementById('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setClearColor(0x000000,0);
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+renderer.setSize(innerWidth,innerHeight,false);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,1,9000);
+const sky=document.getElementById('sky');
+
+function dotTexture(){
+  const c=document.createElement('canvas');c.width=c.height=64;
+  const g=c.getContext('2d');
+  const gr=g.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.25,'rgba(255,255,255,.85)');gr.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=gr;g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+function glowTexture(c1,c2,a=1){
+  const c=document.createElement('canvas');c.width=c.height=256;
+  const g=c.getContext('2d');
+  const gr=g.createRadialGradient(128,128,0,128,128,128);
+  gr.addColorStop(0,`rgba(${c1},${a})`);gr.addColorStop(.35,`rgba(${c2},${a*.35})`);gr.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=gr;g.fillRect(0,0,256,256);
+  return new THREE.CanvasTexture(c);
+}
+const DOT=dotTexture();
+
+// Estrellas cercanas en dos capas (dan profundidad sobre la foto de fondo)
+function starLayer(count,size){
+  const g=new THREE.BufferGeometry();
+  const pos=new Float32Array(count*3),col=new Float32Array(count*3);
+  const tints=[[1,1,1],[.75,.85,1],[1,.9,.75],[.85,.8,1]];
+  for(let i=0;i<count;i++){
+    const r=1500+Math.random()*2200,th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1);
+    pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.cos(ph);pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);
+    col.set(tints[(Math.random()*tints.length)|0],i*3);
+  }
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const m=new THREE.PointsMaterial({size,map:DOT,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+  scene.add(new THREE.Points(g,m));
+  return m;
+}
+const starsA=starLayer(1300,8),starsB=starLayer(600,13);
+
+// Velos de nebulosa, suaves para no tapar la foto de fondo
+[['155,123,255',-1000,300,-1900,1700],['102,227,255',1300,-250,-1500,1400],['255,120,190',350,750,-2100,1500],
+ ['80,90,255',-1400,-500,-900,1600],['155,123,255',1000,500,1700,1600],['102,227,255',-800,-350,1800,1300]]
+.forEach(([c,x,y,z,s])=>{
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexture(c,c,.28),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.4}));
+  sp.position.set(x,y,z);sp.scale.set(s,s,1);scene.add(sp);
+});
+
+// Galaxia espiral
+const galaxy=new THREE.Group();scene.add(galaxy);
+(function(){
+  const N=small()?12000:20000,R=300,B=4;
+  const pos=new Float32Array(N*3),col=new Float32Array(N*3);
+  const cIn=new THREE.Color('#ffd7a8'),cMid=new THREE.Color('#c08bff'),cOut=new THREE.Color('#4f7bff'),tmp=new THREE.Color();
+  for(let i=0;i<N;i++){
+    const r=Math.pow(Math.random(),1.35)*R;
+    const arm=(i%B)/B*Math.PI*2,spin=r/R*4.2;
+    const spread=()=>Math.pow(Math.random(),2.6)*(Math.random()<.5?1:-1)*.38*(r+20);
+    pos[i*3]=Math.cos(arm+spin)*r+spread();
+    pos[i*3+1]=spread()*.3;
+    pos[i*3+2]=Math.sin(arm+spin)*r+spread();
+    const t=r/R;
+    if(t<.45)tmp.copy(cIn).lerp(cMid,t/.45);else tmp.copy(cMid).lerp(cOut,(t-.45)/.55);
+    col[i*3]=tmp.r;col[i*3+1]=tmp.g;col[i*3+2]=tmp.b;
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  galaxy.add(new THREE.Points(g,new THREE.PointsMaterial({size:3.2,map:DOT,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending})));
+  const core=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexture('255,240,220','255,170,110'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+  core.scale.set(170,170,1);galaxy.add(core);
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexture('190,140,255','80,90,255'),transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:.35}));
+  halo.scale.set(600,600,1);galaxy.add(halo);
+})();
+
+// Frases flotando sobre los brazos de la galaxia
+const phrases=[];
+function phraseTexture(text){
+  const c=document.createElement('canvas');c.width=1024;c.height=160;
+  const g=c.getContext('2d');
+  g.textAlign='center';g.textBaseline='middle';
+  let fs=84;
+  const font=()=>`italic 600 ${fs}px 'Cormorant Garamond', Georgia, serif`;
+  g.font=font();
+  while(g.measureText(text).width>940&&fs>34){fs-=2;g.font=font();}
+  g.lineJoin='round';
+  // Contorno oscuro para que se lea encima de la galaxia brillante
+  g.shadowColor='rgba(0,0,0,.9)';g.shadowBlur=14;
+  g.strokeStyle='rgba(10,6,30,.85)';g.lineWidth=10;g.strokeText(text,512,82);
+  g.shadowColor='rgba(255,190,240,.9)';g.shadowBlur=22;
+  g.fillStyle='#fff6e8';g.fillText(text,512,82);
+  g.shadowBlur=0;g.fillText(text,512,82);
+  const t=new THREE.CanvasTexture(c);t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+function buildPhrases(){
+  const n=small()?14:22;
+  for(let i=0;i<n;i++){
+    const text=CONFIG.frases[i%CONFIG.frases.length];
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:phraseTexture(text),transparent:true,depthWrite:false}));
+    const w=small()?190:165;sp.scale.set(w,w*160/1024,1);
+    const r=60+Math.random()*220,arm=(i%4)/4*Math.PI*2+r/300*4.2+(Math.random()-.5)*.5;
+    sp.position.set(Math.cos(arm)*r,(Math.random()-.5)*50+8,Math.sin(arm)*r);
+    sp.userData.phase=Math.random()*Math.PI*2;
+    galaxy.add(sp);phrases.push(sp);
+  }
+}
+Promise.race([document.fonts.load("italic 500 72px 'Cormorant Garamond'"),new Promise(r=>setTimeout(r,2500))]).catch(()=>{}).then(buildPhrases);
+
+// ---------- Fotos en marcos de estrella, en un anillo alrededor de la galaxia ----------
+function starPath(g,cx,cy,R,r){
+  g.beginPath();
+  for(let i=0;i<10;i++){
+    const a=-Math.PI/2+i*Math.PI/5,rad=i%2?r:R;
+    g.lineTo(cx+Math.cos(a)*rad,cy+Math.sin(a)*rad);
+  }
+  g.closePath();
+}
+// Estrella de color con brillo (se usa cuando el navegador no deja pintar la foto, p. ej. al abrir el archivo con doble clic)
+const STAR_HUES=[45,320,190,268,18,150];
+function colorStarTexture(i){
+  const S=512,c=document.createElement('canvas');c.width=c.height=S;
+  const g=c.getContext('2d');
+  const h=STAR_HUES[i%STAR_HUES.length],cx=S/2,cy=S/2+14,R=170;
+  const halo=g.createRadialGradient(cx,cy,0,cx,cy,S/2);
+  halo.addColorStop(0,`hsla(${h},100%,75%,.55)`);halo.addColorStop(.45,`hsla(${h},100%,60%,.18)`);halo.addColorStop(1,`hsla(${h},100%,50%,0)`);
+  g.fillStyle=halo;g.fillRect(0,0,S,S);
+  g.save();
+  g.shadowColor=`hsla(${h},100%,70%,1)`;g.shadowBlur=45;
+  const body=g.createRadialGradient(cx,cy-20,0,cx,cy,R);
+  body.addColorStop(0,'#ffffff');body.addColorStop(.3,`hsl(${h},100%,85%)`);body.addColorStop(1,`hsl(${h},95%,55%)`);
+  g.fillStyle=body;starPath(g,cx,cy,R,R*.48);g.fill();
+  g.restore();
+  // Destello en cruz
+  g.globalCompositeOperation='lighter';
+  [[S*.48,3],[S*.3,2]].forEach(([len,w],k)=>{
+    const ang=k?Math.PI/4:0;
+    for(const a of [ang,ang+Math.PI/2]){
+      const dx=Math.cos(a)*len,dy=Math.sin(a)*len;
+      const gr=g.createLinearGradient(cx-dx,cy-dy,cx+dx,cy+dy);
+      gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(.5,'rgba(255,255,255,.9)');gr.addColorStop(1,'rgba(255,255,255,0)');
+      g.strokeStyle=gr;g.lineWidth=w;g.beginPath();g.moveTo(cx-dx,cy-dy);g.lineTo(cx+dx,cy+dy);g.stroke();
+    }
+  });
+  return new THREE.CanvasTexture(c);
+}
+function starPhotoTexture(img,fx,fy,i){
+  const S=512,c=document.createElement('canvas');c.width=c.height=S;
+  const g=c.getContext('2d');
+  const R=236,cx=S/2,cy=S/2+R*.095;
+  // Borde dorado con brillo
+  g.save();
+  g.shadowColor='rgba(255,210,161,.95)';g.shadowBlur=26;
+  const rim=g.createLinearGradient(0,0,S,S);
+  rim.addColorStop(0,'#fff1dc');rim.addColorStop(.45,'#ffd2a1');rim.addColorStop(1,'#b59bff');
+  g.fillStyle=rim;starPath(g,cx,cy,R,R*.56);g.fill();
+  g.restore();
+  // Foto recortada dentro de la estrella
+  const Rp=R*.9;
+  g.save();starPath(g,cx,cy,Rp,Rp*.56);g.clip();
+  const box=Rp*2,s=Math.max(box/img.naturalWidth,box/img.naturalHeight);
+  const dw=img.naturalWidth*s,dh=img.naturalHeight*s;
+  g.drawImage(img,cx-Rp-(dw-box)*fx,cy-Rp-(dh-box)*fy,dw,dh);
+  g.restore();
+  // Si el navegador bloquea la foto (lienzo "contaminado"), WebGL la pintaría como un cuadrado negro
+  try{g.getImageData(0,0,1,1);}catch(_){return colorStarTexture(i);}
+  const t=new THREE.CanvasTexture(c);t.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+const photoRing=new THREE.Group();scene.add(photoRing);
+const photoSprites=[];
+FOTOS.forEach((f,i)=>{
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthWrite:false,opacity:0}));
+  const n=FOTOS.length,a=i/n*Math.PI*2;
+  const R=small()?360:390;
+  sp.position.set(Math.cos(a)*R,(i%2?1:-1)*38+Math.sin(a*3)*14,Math.sin(a)*R);
+  const size=small()?96:82;sp.scale.set(size,size,1);
+  sp.userData={index:i,phase:Math.random()*Math.PI*2,baseY:sp.position.y,ready:false};
+  const img=new Image();
+  const setMap=t=>{sp.material.map=t;sp.material.needsUpdate=true;sp.userData.ready=true;};
+  img.onload=()=>setMap(starPhotoTexture(img,f.fx,f.fy,i));
+  img.onerror=()=>setMap(colorStarTexture(i));
+  img.src=f.src;
+  photoRing.add(sp);photoSprites.push(sp);
+});
+
+// Planeta con anillos y una luna, debajo del disco de la galaxia
+scene.add(new THREE.AmbientLight(0x6670b0,.35));
+const sun=new THREE.PointLight(0xffe2c0,2.2,0);scene.add(sun);
+function planetTexture(){
+  const c=document.createElement('canvas');c.width=512;c.height=256;
+  const g=c.getContext('2d');
+  const stops=['#1d1f5c','#3b3a9a','#8e7bff','#46c6d6','#2a2f7a','#b9a8ff','#1d1f5c'];
+  for(let y=0;y<256;y++){
+    const t=(y/256+Math.sin(y*.09)*.03+Math.sin(y*.31)*.012)*(stops.length-1);
+    const i=clamp(Math.floor(t),0,stops.length-2);
+    const a=new THREE.Color(stops[i]),b=new THREE.Color(stops[i+1]);
+    g.fillStyle='#'+a.lerp(b,t-i).getHexString();g.fillRect(0,y,512,1);
+  }
+  return new THREE.CanvasTexture(c);
+}
+function ringTexture(){
+  const S=512,c=document.createElement('canvas');c.width=c.height=S;
+  const g=c.getContext('2d');g.translate(S/2,S/2);
+  const r0=S/2*40/66,r1=S/2;
+  for(let r=r0;r<r1;r+=1.5){
+    const t=(r-r0)/(r1-r0);
+    const a=(.25+.55*Math.abs(Math.sin(t*22))*(1-t*.6))*(Math.random()*.4+.8);
+    g.strokeStyle=`rgba(${Math.round(lerp(210,110,t))},${Math.round(lerp(225,200,t))},255,${a})`;
+    g.lineWidth=1.6;g.beginPath();g.arc(0,0,r,0,Math.PI*2);g.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+}
+const orbit=new THREE.Group();scene.add(orbit);
+const sys=new THREE.Group();sys.position.set(230,-130,0);sys.rotation.z=.42;sys.scale.setScalar(.8);orbit.add(sys);
+const planet=new THREE.Mesh(new THREE.SphereGeometry(30,48,48),new THREE.MeshStandardMaterial({map:planetTexture(),roughness:.9,metalness:0}));
+sys.add(planet);
+const ring=new THREE.Mesh(new THREE.RingGeometry(40,66,128),new THREE.MeshBasicMaterial({map:ringTexture(),transparent:true,side:THREE.DoubleSide,depthWrite:false}));
+ring.rotation.x=Math.PI/2.3;sys.add(ring);
+const moonPivot=new THREE.Group();sys.add(moonPivot);
+const moon=new THREE.Mesh(new THREE.SphereGeometry(6,24,24),new THREE.MeshStandardMaterial({color:0xcfc6ee,roughness:1}));
+moon.position.set(88,10,0);moonPivot.add(moon);
+
+// Constelación con forma de corazón, en el fondo, aparece al llegar
+const heart=new THREE.Group();heart.position.set(0,-40,-1900);scene.add(heart);
+const heartPts=[];
+for(let i=0;i<16;i++){
+  const t=i/16*Math.PI*2;
+  heartPts.push(new THREE.Vector3(16*Math.pow(Math.sin(t),3)*18,(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))*18,0));
+}
+const heartLineMat=new THREE.LineBasicMaterial({color:0x9b7bff,transparent:true,opacity:0});
+heart.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(heartPts),heartLineMat));
+const heartStarMat=new THREE.PointsMaterial({size:34,map:DOT,color:0xffe6c8,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
+heart.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(heartPts),heartStarMat));
+let heartTarget=0;
+
+// ---------- Cámara y controles ----------
+let tRotX=.42,tRotY=0,rotX=.42,rotY=0,velX=0,velY=0;
+const baseDist=()=>small()?820:620;
+let tDist=baseDist(),dist=1700,flight=null,launched=false;
+const pointers=new Map();let pinchD=0,tap=null;
+const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
+canvas.addEventListener('pointerdown',e=>{
+  try{canvas.setPointerCapture(e.pointerId);}catch(_){}
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});velX=velY=0;
+  tap=pointers.size===1?{x:e.clientX,y:e.clientY,t:performance.now()}:null;
+});
+canvas.addEventListener('pointermove',e=>{
+  const p=pointers.get(e.pointerId);if(!p)return;
+  if(pointers.size===1){
+    const dx=e.clientX-p.x,dy=e.clientY-p.y;
+    velY=-dx*Math.PI*1.4/innerWidth;velX=dy*Math.PI*.8/innerHeight;
+    tRotY+=velY;tRotX=clamp(tRotX+velX,-1.2,1.2);
+  }
+  p.x=e.clientX;p.y=e.clientY;
+  if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>8)tap=null;
+  if(pointers.size===2){
+    const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinchD)tDist=clamp(tDist+(pinchD-d)*1.4,220,1500);
+    pinchD=d;
+  }
+});
+const lift=e=>{
+  pointers.delete(e.pointerId);if(pointers.size<2)pinchD=0;
+  if(tap&&e.type==='pointerup'&&performance.now()-tap.t<500&&launched){
+    ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);
+    raycaster.setFromCamera(ndc,camera);
+    const hit=raycaster.intersectObjects(photoSprites.filter(s=>s.userData.ready))[0];
+    if(hit)openViewer(hit.object.userData.index);
+  }
+  tap=null;
+};
+canvas.addEventListener('pointerup',lift);canvas.addEventListener('pointercancel',lift);
+canvas.addEventListener('wheel',e=>{e.preventDefault();tDist=clamp(tDist+e.deltaY*.5,220,1500);},{passive:false});
+
+// ---------- Efectos 2D: estrellas fugaces y salto a velocidad luz ----------
+const fx=document.getElementById('fx'),fctx=fx.getContext('2d');
+function sizeFx(){const dpr=Math.min(devicePixelRatio||1,2);fx.width=innerWidth*dpr;fx.height=innerHeight*dpr;fctx.setTransform(dpr,0,0,dpr,0,0);}
+sizeFx();
+const meteors=[];let nextMeteor=2;
+const streaks=Array.from({length:240},()=>({a:Math.random()*Math.PI*2,r:Math.random()}));
+let warp=0;
+function drawFx(dt){
+  fctx.clearRect(0,0,innerWidth,innerHeight);
+  if(warp>.01){
+    const cx=innerWidth/2,cy=innerHeight/2,R=Math.hypot(cx,cy);
+    fctx.lineCap='round';
+    streaks.forEach(s=>{
+      s.r+=dt*(.4+s.r*2.2)*warp;if(s.r>1){s.r=Math.random()*.15;s.a=Math.random()*Math.PI*2;}
+      const r1=s.r*R,r2=r1+(30+s.r*320)*warp;
+      fctx.strokeStyle=`rgba(205,220,255,${warp*.85*s.r})`;fctx.lineWidth=.6+s.r*1.8;
+      fctx.beginPath();fctx.moveTo(cx+Math.cos(s.a)*r1,cy+Math.sin(s.a)*r1);fctx.lineTo(cx+Math.cos(s.a)*r2,cy+Math.sin(s.a)*r2);fctx.stroke();
+    });
+  }
+  if(launched&&!reduced){
+    nextMeteor-=dt;
+    if(nextMeteor<=0){
+      nextMeteor=2+Math.random()*4;
+      const dir=Math.random()<.5?1:-1,ang=(dir>0?.55:Math.PI-.55)+(Math.random()-.5)*.3,sp=900+Math.random()*600;
+      meteors.push({x:dir>0?Math.random()*innerWidth*.6:innerWidth*(.4+Math.random()*.6),y:Math.random()*innerHeight*.35,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,len:120+Math.random()*120,t:0,life:.9+Math.random()*.5});
+    }
+  }
+  for(let i=meteors.length-1;i>=0;i--){
+    const m=meteors[i];m.t+=dt;const k=m.t/m.life;
+    if(k>=1){meteors.splice(i,1);continue;}
+    m.x+=m.vx*dt;m.y+=m.vy*dt;
+    const a=Math.sin(k*Math.PI),sp=Math.hypot(m.vx,m.vy);
+    const tx=m.x-m.vx/sp*m.len,ty=m.y-m.vy/sp*m.len;
+    const gr=fctx.createLinearGradient(m.x,m.y,tx,ty);
+    gr.addColorStop(0,`rgba(255,255,255,${a})`);gr.addColorStop(1,'rgba(155,123,255,0)');
+    fctx.strokeStyle=gr;fctx.lineWidth=1.6;fctx.beginPath();fctx.moveTo(m.x,m.y);fctx.lineTo(tx,ty);fctx.stroke();
+  }
+}
+
+// ---------- Música ambiental generada (sin archivos) ----------
+let actx=null,master=null,soundOn=true,song=null;
+function startMusic(){
+  if(!CONFIG.musica){startPad();return;}
+  song=new Audio(CONFIG.musica);song.loop=true;song.volume=0;
+  song.addEventListener('error',()=>{song=null;if(!actx)startPad();},{once:true});
+  song.play().then(()=>{
+    const iv=setInterval(()=>{if(!song){clearInterval(iv);return;}song.volume=Math.min(.8,song.volume+.04);if(song.volume>=.8)clearInterval(iv);},120);
+  }).catch(()=>{});
+}
+function startPad(){
+  try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(_){return;}
+  master=actx.createGain();master.gain.value=0;
+  const filter=actx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=950;
+  const delay=actx.createDelay(2);delay.delayTime.value=.6;
+  const fb=actx.createGain();fb.gain.value=.38;
+  filter.connect(master);filter.connect(delay);delay.connect(fb);fb.connect(delay);delay.connect(master);
+  master.connect(actx.destination);
+  [110,164.81,220,277.18,329.63,415.3].forEach((f,i)=>{
+    const o=actx.createOscillator();o.type=i%2?'sine':'triangle';o.frequency.value=f;o.detune.value=(Math.random()-.5)*10;
+    const g=actx.createGain();g.gain.value=.055;
+    const lfo=actx.createOscillator();lfo.frequency.value=.04+Math.random()*.08;
+    const lg=actx.createGain();lg.gain.value=.045;
+    lfo.connect(lg);lg.connect(g.gain);o.connect(g);g.connect(filter);o.start();lfo.start();
+  });
+  master.gain.linearRampToValueAtTime(.5,actx.currentTime+4);
+  const notes=[880,987.77,1108.73,1318.51,1479.98];
+  (function chime(){
+    if(soundOn&&actx.state==='running'){
+      const o=actx.createOscillator(),g=actx.createGain(),t=actx.currentTime;
+      o.type='sine';o.frequency.value=notes[(Math.random()*notes.length)|0];
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.05,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+2.4);
+      o.connect(g);g.connect(filter);o.start(t);o.stop(t+2.5);
+    }
+    setTimeout(chime,2800+Math.random()*4500);
+  })();
+}
+const soundBtn=document.getElementById('soundBtn'),soundIcon=document.getElementById('soundIcon');
+soundBtn.addEventListener('click',()=>{
+  soundOn=!soundOn;
+  soundBtn.setAttribute('aria-pressed',String(soundOn));
+  soundBtn.setAttribute('aria-label',soundOn?'Silenciar música':'Activar música');
+  soundIcon.innerHTML=soundOn?'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>':'<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/>';
+  if(song){if(soundOn){song.volume=.8;song.play().catch(()=>{});}else song.pause();return;}
+  if(!actx)startMusic();
+  if(actx){actx.resume();master.gain.cancelScheduledValues(actx.currentTime);master.gain.linearRampToValueAtTime(soundOn?.5:0,actx.currentTime+.6);}
+});
+
+// ---------- Capas: mensaje, galería y foto ampliada ----------
+const layers=[];
+function makeLayer(id,closeId,opener){
+  const el=document.getElementById(id),closeBtn=document.getElementById(closeId);
+  let back=null;
+  const L={el,open(){back=document.activeElement;el.classList.add('open');closeBtn.focus();},close(){el.classList.remove('open');if(back&&back.focus)back.focus();},isOpen:()=>el.classList.contains('open')};
+  closeBtn.addEventListener('click',L.close);
+  el.addEventListener('click',e=>{if(e.target===el)L.close();});
+  if(opener)document.getElementById(opener).addEventListener('click',L.open);
+  layers.push(L);return L;
+}
+const msgL=makeLayer('msg','msgClose','msgBtn');
+document.getElementById('letterBtn').addEventListener('click',msgL.open);
+const galL=makeLayer('gallery','galClose','galBtn');
+const viewL=makeLayer('viewer','viewClose');
+
+const grid=document.getElementById('grid');
+FOTOS.forEach((f,i)=>{
+  const b=document.createElement('button');b.type='button';b.className='tile';
+  b.setAttribute('aria-label',`Ver foto ${i+1}`);
+  b.innerHTML=`<span class="glow"><span class="rim"><img alt="" loading="lazy"></span></span><span>${String(i+1).padStart(2,'0')}</span>`;
+  const im=b.querySelector('img');im.src=f.src;im.style.objectPosition=`${f.fx*100}% ${f.fy*100}%`;
+  b.addEventListener('click',()=>openViewer(i));
+  grid.appendChild(b);
+});
+
+let current=0;
+const viewImg=document.getElementById('viewImg'),viewCap=document.getElementById('viewCap');
+function showPhoto(i){
+  current=(i+FOTOS.length)%FOTOS.length;
+  viewImg.src=FOTOS[current].src;
+  viewImg.alt=`Foto ${current+1} de ${FOTOS.length}`;
+  viewCap.textContent=`Estrella ${String(current+1).padStart(2,'0')} de ${FOTOS.length}`;
+}
+function openViewer(i){showPhoto(i);if(!viewL.isOpen())viewL.open();}
+document.getElementById('prev').addEventListener('click',()=>showPhoto(current-1));
+document.getElementById('next').addEventListener('click',()=>showPhoto(current+1));
+addEventListener('keydown',e=>{
+  if(viewL.isOpen()){
+    if(e.key==='ArrowLeft')showPhoto(current-1);
+    if(e.key==='ArrowRight')showPhoto(current+1);
+  }
+  if(e.key==='Escape'){const top=[...layers].reverse().find(l=>l.isOpen());if(top)top.close();}
+});
+// Deslizar con el dedo en la foto ampliada
+let swipeX=null;
+viewImg.addEventListener('touchstart',e=>{swipeX=e.touches[0].clientX;},{passive:true});
+viewImg.addEventListener('touchend',e=>{
+  if(swipeX===null)return;const dx=e.changedTouches[0].clientX-swipeX;swipeX=null;
+  if(Math.abs(dx)>40)showPhoto(current+(dx<0?1:-1));
+},{passive:true});
+
+// ---------- Despegue ----------
+const launch=document.getElementById('launch'),count=document.getElementById('count'),hint=document.getElementById('hint');
+launch.addEventListener('click',()=>{
+  if(launch.dataset.busy)return;launch.dataset.busy='1';
+  startMusic();
+  const go=()=>{
+    launch.classList.add('gone');
+    flight={start:performance.now(),dur:reduced?1200:3800,from:dist};
+    launched=true;
+    setTimeout(()=>document.getElementById('letterBtn').classList.add('show'),reduced?600:3200);
+    setTimeout(()=>hint.classList.add('show'),2500);
+    setTimeout(()=>hint.classList.remove('show'),10000);
+  };
+  if(reduced){go();return;}
+  document.getElementById('launchLabel').hidden=true;
+  document.getElementById('launchSub').hidden=true;
+  count.hidden=false;
+  let n=3;count.textContent=n;
+  const iv=setInterval(()=>{n--;if(n>0)count.textContent=n;else{clearInterval(iv);go();}},750);
+});
+
+// ---------- Animación ----------
+const clock=new THREE.Clock();let time=0;
+function tick(){
+  requestAnimationFrame(tick);
+  const dt=Math.min(clock.getDelta(),.05);time+=dt;
+  if(flight){
+    const p=Math.min((performance.now()-flight.start)/flight.dur,1);
+    dist=lerp(flight.from,tDist,ease(p));
+    warp=reduced?0:Math.sin(p*Math.PI)*(1-p*.4);
+    if(p>=1){flight=null;warp=0;heartTarget=1;}
+  }else dist+=(tDist-dist)*.06;
+  if(!pointers.size){
+    velX*=.9;velY*=.9;
+    tRotX=clamp(tRotX+velX,-1.2,1.2);tRotY+=velY+(launched?(reduced?.0002:.0007):0);
+  }
+  rotX+=(tRotX-rotX)*.12;rotY+=(tRotY-rotY)*.12;
+
+  const spin=reduced?.3:1;
+  galaxy.rotation.y+=dt*.035*spin;
+  photoRing.rotation.y-=dt*.03*spin;
+  orbit.rotation.y+=dt*.05*spin;
+  planet.rotation.y+=dt*.25*spin;
+  moonPivot.rotation.y+=dt*.6*spin;
+  starsA.opacity=.75+.25*Math.sin(time*1.3);
+  starsB.opacity=.55+.45*Math.sin(time*.9+1.7);
+  phrases.forEach(s=>{s.material.opacity=.88+.12*Math.sin(time*1.4+s.userData.phase);});
+  photoSprites.forEach(s=>{
+    const u=s.userData;
+    if(u.ready)s.material.opacity+=(1-s.material.opacity)*.04;
+    s.position.y=u.baseY+Math.sin(time*.8+u.phase)*6*spin;
+    s.material.rotation=Math.sin(time*.5+u.phase)*.08*spin;
+  });
+  heartLineMat.opacity+=(heartTarget*.45-heartLineMat.opacity)*.02;
+  heartStarMat.opacity+=(heartTarget-heartStarMat.opacity)*.02;
+
+  const cx=Math.cos(rotX);
+  camera.position.set(dist*Math.sin(rotY)*cx,dist*Math.sin(rotX),dist*Math.cos(rotY)*cx);
+  camera.lookAt(0,0,0);
+  heart.lookAt(camera.position);
+  renderer.render(scene,camera);
+
+  // La foto de fondo se mueve un poco con la cámara para dar profundidad
+  const zoom=1+clamp((1700-dist)/1700,0,1)*.08;
+  sky.style.transform=`translate3d(${Math.sin(rotY)*-28}px,${(rotX-.42)*40}px,0) scale(${zoom})`;
+  drawFx(dt);
+}
+tick();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight,false);sizeFx();
+});
+</script>
